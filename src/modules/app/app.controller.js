@@ -19,6 +19,18 @@ export class AppController extends ControllerUtils {
    * invoke the service to obtain a response for the specified endpoint
    */
   appInformation () {
+    /**
+     * @swagger
+     * /api/v1/:
+     *   get:
+     *     summary: test swagger documentation
+     *     description: description to test
+     *     responses:
+     *       '200':
+     *         description: Successful response
+     *       '404':
+     *         description: User not found
+    */
     this.router.get('/', (req, res) => {
       res.send(this.appService.responseMainRouter());
     });
