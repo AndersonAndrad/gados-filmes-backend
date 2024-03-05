@@ -4,6 +4,7 @@ import { CrudServiceUtils } from '../../../utils/crud/crud-service.utils.js';
 import { UtilsBcrypt } from '../../../utils/password/bcrypt.js';
 import { AuthService } from '../../auth/services/auth.services.js';
 import { MovieRepository } from '../../movie/repository/movie.repository.js';
+import { MovieService } from '../../movie/services/movie.service.js';
 import { UserRepository } from '../repository/user.repository.js';
 import { ValidateUserSchema } from '../validators/user-schema.validator.js';
 
@@ -12,6 +13,7 @@ export class UserService extends CrudServiceUtils {
     super();
     this.userRepository = new UserRepository();
     this.movieRepository = new MovieRepository();
+    this.movieService = new MovieService();
     this.validateUserSchema = new ValidateUserSchema();
     this.logger = new Logger();
     this.authService = new AuthService();
@@ -62,15 +64,13 @@ export class UserService extends CrudServiceUtils {
     try {
       await this.validateUserSchema.createMovies(movieUserData);
 
-      await this.findOne(idUser);
+      await this.movieService.findOne(movieUserData.id_filme);
 
-      const movie = await this.movieRepository.findOne(movieUserData.idFilme);
+      const rateMovieByUser = await this.verifyMovieUserAssociation(movieUserData.id_filme, idUser);
 
-      if (!movie) {
-        throw new CustomHttpError('Filme não encontrado', 200);
+      if (rateMovieByUser) {
+        throw new CustomHttpError('Este filme já está associado à sua conta.', 400);
       }
-
-      await this.verifyMovieUserAssociation(movieUserData.idFilme, idUser);
 
       const movieAddedToUser = await this.userRepository.addMovieToUser(movieUserData, idUser);
 
@@ -88,9 +88,32 @@ export class UserService extends CrudServiceUtils {
     try {
       const movieUserAssociation = await this.userRepository.findMovieUserAssociation(idMovie, idUser);
 
-      if (movieUserAssociation) {
-        throw new CustomHttpError('Este filme já está associado à sua conta.', 400);
+      return movieUserAssociation;
+    } catch (error) {
+      CustomHttpError.checkAndThrowError(error);
+    }
+  }
+
+  async rateMovieByUser (dataRate, idUser) {
+    try {
+      console.log(dataRate);
+      await this.movieService.findOne(dataRate.id_filme);
+
+      const movieUserAssociation = await this.verifyMovieUserAssociation(dataRate.id_filme, idUser);
+
+      if (!movieUserAssociation) {
+        throw new CustomHttpError('Este filme não está associado à sua conta. Adicione primeiro em sua biblioteca.', 400);
       }
+
+      await this.findOne(idUser);
+
+      const rateMovieByUser = await this.userRepository.rateMovieByUser({ movieUserId: movieUserAssociation.id, ...dataRate }, idUser);
+
+      if (!rateMovieByUser) {
+        throw new CustomHttpError('Não foi possível atualizar o filme', 500);
+      }
+
+      return { mensagem: 'Nota atualizada com sucesso.' };
     } catch (error) {
       CustomHttpError.checkAndThrowError(error);
     }
